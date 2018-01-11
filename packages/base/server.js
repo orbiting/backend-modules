@@ -24,6 +24,7 @@ const {
 // middlewares
 const { express: { auth } } = require('@orbiting/backend-modules-auth')
 const requestLog = require('./express/requestLog')
+const rateLimit = require('./express/rateLimit')
 const graphql = require('./express/graphql')
 
 let pgdb
@@ -48,7 +49,7 @@ module.exports.run = (executableSchema, middlewares, t, signInHooks) => {
     engine.start()
   }
 
-  return PgDb.connect().then( async (_pgdb) => {
+  return PgDb.connect().then(async (_pgdb) => {
     pgdb = _pgdb
     server = express()
     httpServer = createServer(server)
@@ -71,6 +72,9 @@ module.exports.run = (executableSchema, middlewares, t, signInHooks) => {
       signInHooks
     })
 
+    // Rate Limiting middleware needs to be after auth to access user id
+    server.use(rateLimit)
+
     if (CORS_WHITELIST_URL) {
       const corsOptions = {
         origin: CORS_WHITELIST_URL.split(','),
@@ -82,7 +86,7 @@ module.exports.run = (executableSchema, middlewares, t, signInHooks) => {
 
     subscriptionServer = graphql(server, pgdb, httpServer, executableSchema, t)
 
-    for(let middleware of middlewares) {
+    for (let middleware of middlewares) {
       await middleware(server, pgdb, t)
     }
 
