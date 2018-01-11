@@ -2,6 +2,7 @@ const bodyParser = require('body-parser')
 const { graphqlExpress, graphiqlExpress } = require('apollo-server-express')
 const { SubscriptionServer } = require('subscriptions-transport-ws')
 const { execute, subscribe } = require('graphql')
+const costAnalysis = require('graphql-cost-analysis').default
 const { pubsub } = require('../lib/RedisPubSub')
 const cookie = require('cookie')
 const cookieParser = require('cookie-parser')
@@ -65,6 +66,15 @@ module.exports = (server, pgdb, httpServer, executableSchema, t) => {
   )
 
   const graphqlMiddleware = graphqlExpress((req) => {
+    const costAnalyzer = costAnalysis({
+      maximumCost: 100000,
+      defaultCost: 10,
+      onComplete(cost, ...rest) {
+        if (req && req.body) {
+          console.log(`cost-analysis / ${req.body.operationName}: ${cost}`)
+        }
+      }
+    });
     return {
       debug: false,
       formatError: (error) => {
@@ -72,6 +82,7 @@ module.exports = (server, pgdb, httpServer, executableSchema, t) => {
         return error
       },
       schema: executableSchema,
+      validationRules: [ costAnalyzer ],
       context: createContext({
         user: req.user,
         req
