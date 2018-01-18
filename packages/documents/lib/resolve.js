@@ -23,6 +23,9 @@ const getRepoId = (url, requireQuery) => {
     pathname,
     query
   } = parse(String(url))
+  if (!pathname) { //empty for mailto
+    return
+  }
   const pathSegments = pathname.split('/').filter(Boolean)
   if (
     hostname !== 'github.com' ||
@@ -70,16 +73,20 @@ const extractUserUrl = url => {
   )
 }
 
-const createUrlReplacer = (allDocuments = [], usernames = [], errors = []) => url => {
+const createUrlReplacer = (allDocuments = [], usernames = [], errors = [], urlPrefix = '', searchString = '') => url => {
   const userInfo = extractUserPath(url)
   if (userInfo) {
     const user = usernames
       .find(u => u.id === userInfo.id)
     if (user) {
-      return userInfo.path.replace(
-        user.id,
-        user.username
-      )
+      return [
+        urlPrefix,
+        userInfo.path.replace(
+         user.id,
+         user.username
+        ),
+        searchString
+      ].join('')
     }
   }
 
@@ -90,7 +97,7 @@ const createUrlReplacer = (allDocuments = [], usernames = [], errors = []) => ur
   const linkedDoc = allDocuments
     .find(d => d.repoId === repoId)
   if (linkedDoc) {
-    return linkedDoc.content.meta.path
+    return urlPrefix+linkedDoc.content.meta.path+searchString
   } else {
     errors.push(repoId)
   }
@@ -114,11 +121,13 @@ const createResolver = (allDocuments, errors = []) => url => {
   return null
 }
 
-const contentUrlResolver = (doc, allDocuments = [], usernames = [], errors) => {
+const contentUrlResolver = (doc, allDocuments = [], usernames = [], errors, urlPrefix, searchString) => {
   const urlReplacer = createUrlReplacer(
     allDocuments,
     usernames,
-    errors
+    errors,
+    urlPrefix,
+    searchString
   )
 
   visit(doc.content, 'link', node => {
@@ -132,11 +141,13 @@ const contentUrlResolver = (doc, allDocuments = [], usernames = [], errors) => {
   })
 }
 
-const metaUrlResolver = (meta, allDocuments = [], usernames = [], errors) => {
+const metaUrlResolver = (meta, allDocuments = [], usernames = [], errors, urlPrefix, searchString) => {
   const urlReplacer = createUrlReplacer(
     allDocuments,
     usernames,
-    errors
+    errors,
+    urlPrefix,
+    searchString
   )
 
   meta.credits && meta.credits

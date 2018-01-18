@@ -3,6 +3,7 @@ const fileType = require('file-type')
 const fetch = require('isomorphic-unfetch')
 const { lib: { clients: createGithubClients } } = require('@orbiting/backend-modules-github')
 const { authenticate } = require('../lib')
+const debug = require('debug')('assets')
 
 const maxSize = 6000
 
@@ -23,7 +24,7 @@ const getDimensions = (resize) => {
     throw new Error('invalid height')
   }
   if (width > maxSize || height > maxSize) {
-    throw new Error('maxSize: '+ maxSize)
+    throw new Error('maxSize: ' + maxSize)
   }
   return {
     width,
@@ -37,12 +38,18 @@ const returnImage = async (res, buffer, resize) => {
     const dimensions = getDimensions(resize)
     width = dimensions.width
     height = dimensions.height
-  } catch(e) {
+  } catch (e) {
     res.status(400).end(e.message)
   }
 
   const type = fileType(buffer)
   const isJPEG = type && type.ext === 'jpg'
+
+  const isGIF = type && type.ext === 'gif'
+
+  if (isGIF) {
+    return res.end(buffer)
+  }
 
   if (width || height || isJPEG) {
     let image = sharp(buffer)
@@ -81,6 +88,7 @@ module.exports = (server) => {
       repoName,
       path
     } = req.params
+    debug('github getBlob %s/%s/%s', login, repoName, path)
 
     const blobSha = path
       .split('/')
@@ -117,18 +125,19 @@ module.exports = (server) => {
       mac,
       resize
     } = req.query
+    debug('external fetch %s', url)
 
     if (!url) {
       return res.status(404).end()
     }
 
     if (!mac || mac !== authenticate(url)) {
-      console.warn('unauthorized asset url requested: '+url)
+      console.warn('unauthorized asset url requested: ' + url)
       return res.status(403).end()
     }
 
     const buffer = await fetch(url, {
-      method: 'GET',
+      method: 'GET'
     })
       .then(response => response.buffer())
       .catch(error => {
@@ -138,5 +147,4 @@ module.exports = (server) => {
 
     return returnImage(res, buffer, resize)
   })
-
 }

@@ -18,7 +18,8 @@ const {
   SESSION_SECRET,
   COOKIE_DOMAIN,
   COOKIE_NAME,
-  ENGINE_API_KEY
+  ENGINE_API_KEY,
+  IGNORE_SSL_HOSTNAME
 } = process.env
 
 // middlewares
@@ -31,7 +32,7 @@ let server
 let httpServer
 let subscriptionServer
 
-module.exports.run = (executableSchema, middlewares, t, signInHooks) => {
+module.exports.run = (executableSchema, middlewares, t, createGraphqlContext) => {
   // init apollo engine
   const engine = ENGINE_API_KEY
     ? new Engine({
@@ -48,7 +49,7 @@ module.exports.run = (executableSchema, middlewares, t, signInHooks) => {
     engine.start()
   }
 
-  return PgDb.connect().then( async (_pgdb) => {
+  return PgDb.connect().then(async (_pgdb) => {
     pgdb = _pgdb
     server = express()
     httpServer = createServer(server)
@@ -56,6 +57,17 @@ module.exports.run = (executableSchema, middlewares, t, signInHooks) => {
     // apollo engine middleware
     if (engine) {
       server.use(engine.expressMiddleware())
+    }
+
+    // redirect to https
+    if (!DEV) {
+      server.enable('trust proxy')
+      server.use( (req, res, next) => {
+        if (!req.secure && (!IGNORE_SSL_HOSTNAME || req.hostname !== IGNORE_SSL_HOSTNAME)) {
+          res.redirect(`https://${req.hostname}${req.url}`)
+        }
+        return next()
+      })
     }
 
     server.use(requestLog)
@@ -67,8 +79,7 @@ module.exports.run = (executableSchema, middlewares, t, signInHooks) => {
       domain: COOKIE_DOMAIN || undefined,
       cookieName: COOKIE_NAME,
       dev: DEV,
-      pgdb: pgdb,
-      signInHooks
+      pgdb: pgdb
     })
 
     if (CORS_WHITELIST_URL) {
@@ -80,9 +91,9 @@ module.exports.run = (executableSchema, middlewares, t, signInHooks) => {
       server.use('*', cors(corsOptions))
     }
 
-    subscriptionServer = graphql(server, pgdb, httpServer, executableSchema, t)
+    subscriptionServer = graphql(server, pgdb, httpServer, executableSchema, createGraphqlContext)
 
-    for(let middleware of middlewares) {
+    for (let middleware of middlewares) {
       await middleware(server, pgdb, t)
     }
 

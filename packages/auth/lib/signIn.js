@@ -3,10 +3,10 @@ const querystring = require('querystring')
 const isEmail = require('email-validator').validate
 const kraut = require('kraut')
 const geoForIP = require('./geoForIP')
-const fetch = require('isomorphic-unfetch')
 const checkEnv = require('check-env')
 const t = require('./t')
 const debug = require('debug')('auth')
+const { authorizeSession } = require('./Sessions')
 const {
   sendMail,
   sendMailTemplate
@@ -18,10 +18,8 @@ checkEnv([
 
 const {
   AUTH_MAIL_FROM_ADDRESS,
-  PUBLIC_URL,
+  FRONTEND_BASE_URL,
   AUTO_LOGIN,
-  BASIC_AUTH_USER,
-  BASIC_AUTH_PASS,
   AUTH_MAIL_TEMPLATE_NAME,
   AUTH_MAIL_SUBJECT
 } = process.env
@@ -73,9 +71,9 @@ module.exports = async (_email, context, pgdb, req) => {
   })
 
   const verificationUrl =
-    (PUBLIC_URL || 'http://' + req.headers.host) +
-    '/auth/email/signin/?' +
+    `${FRONTEND_BASE_URL}/mitteilung?` +
     querystring.stringify({
+      type: 'token-authorization',
       email,
       context,
       token
@@ -89,17 +87,8 @@ module.exports = async (_email, context, pgdb, req) => {
     if (testMatch) {
       if (testMatch[1].indexOf('not') === -1) {
         setTimeout(async () => {
-          if (BASIC_AUTH_PASS) {
-            const result = await fetch(verificationUrl, {
-              headers: {
-                'Authorization': 'Basic ' + (Buffer.from(BASIC_AUTH_USER + ':' + BASIC_AUTH_PASS).toString('base64'))
-              }
-            })
-            console.log('AUTO_LOGIN: ' + await result.text())
-          } else {
-            const result = await fetch(verificationUrl)
-            console.log('AUTO_LOGIN: ' + await result.text())
-          }
+          console.log('AUTO_LOGIN!')
+          await authorizeSession({ pgdb, token, emailFromQuery: email })
         }, 2000)
       }
       return {phrase}

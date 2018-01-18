@@ -21,12 +21,17 @@ const {
   ENGINE_API_KEY
 } = process.env
 
-module.exports = (server, pgdb, httpServer, executableSchema, t) => {
-  const createContext = ({user, ...additional} = {}) => ({
+module.exports = (
+  server,
+  pgdb,
+  httpServer,
+  executableSchema,
+  externalCreateGraphQLContext = a => a,
+) => {
+  const createContext = ({user, ...additional} = {}) => externalCreateGraphQLContext({
     ...additional,
     pgdb,
     user,
-    t,
     pubsub,
     redis
   })
@@ -48,7 +53,7 @@ module.exports = (server, pgdb, httpServer, executableSchema, t) => {
           cookies['connect.sid'],
           process.env.SESSION_SECRET
         )
-        const session = await pgdb.public.sessions.findOne({ sid })
+        const session = sid && await pgdb.public.sessions.findOne({ sid })
         if (session) {
           const user = await pgdb.public.users.findOne({id: session.sess.passport.user})
           return createContext({

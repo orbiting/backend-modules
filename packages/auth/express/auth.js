@@ -1,13 +1,15 @@
 const session = require('express-session')
 const PgSession = require('connect-pg-simple')(session)
 const passport = require('passport')
-const transformUser = require('../lib/transformUser')
 const checkEnv = require('check-env')
 const querystring = require('querystring')
 const debug = require('debug')('auth')
+const { QueryEmailMismatchError, NoSessionError } = require('../lib/errors')
+const transformUser = require('../lib/transformUser')
+const { authorizeSession } = require('../lib/Sessions')
 
 checkEnv([
-  'FRONTEND_BASE_URL',
+  'FRONTEND_BASE_URL'
 ])
 
 const {
@@ -29,8 +31,6 @@ exports.configure = ({
   maxAge = 60000 * 60 * 24 * 7 * 2,
   // is the server running in development
   dev = false,
-  // hooks are called upon successful signIn
-  signInHooks = []
 } = {}) => {
   if (server === null) {
     throw new Error('server option must be an express server instance')
@@ -46,7 +46,6 @@ exports.configure = ({
     tableName: 'sessions'
   })
   const Users = pgdb.public.users
-  const Sessions = pgdb.public.sessions
 
   // Configure sessions
   server.use(session({
@@ -68,119 +67,6 @@ exports.configure = ({
   if (!dev) {
     server.set('trust proxy', 1)
   }
-
-  // authenticate a token sent by email
-  server.get('/auth/email/signin/:token?', async (req, res) => {
-    const {
-      token,
-      email: emailFromQuery,
-      context
-    } = req.query
-
-    if (!token) {
-      debug('no token: %O', { req: req._log(), emailFromQuery, context })
-      return res.redirect(
-        `${FRONTEND_BASE_URL}/notifications?` +
-        querystring.stringify({
-          type: 'invalid-token',
-          email: emailFromQuery,
-          context
-        })
-      )
-    }
-
-    try {
-      // Look up session by token
-      const session = await Sessions.findOne({
-        'sess @>': { token }
-      })
-      if (!session) {
-        debug('no session: %O', { req: req._log(), token, emailFromQuery, context })
-        return res.redirect(
-          `${FRONTEND_BASE_URL}/notifications?` +
-          querystring.stringify({
-            type: 'invalid-token',
-            email: emailFromQuery,
-            context
-          })
-        )
-      }
-
-      const {
-        email
-      } = session.sess
-      if (emailFromQuery && email !== emailFromQuery) { // emailFromQuery might be null for old links
-        debug("session.email and query.email don't match: %O", { req: req._log(), token, email, emailFromQuery, context })
-        return res.redirect(
-          `${FRONTEND_BASE_URL}/notifications?` +
-          querystring.stringify({
-            type: 'invalid-token',
-            email,
-            context
-          })
-        )
-      }
-
-      // verify and/or create the user
-      const existingUser = await Users.findOne({
-        email
-      })
-      const user = existingUser
-        ? existingUser
-        : await Users.insertAndGet({
-            email,
-            verified: true
-          })
-      if (!user.verified) {
-        await Users.updateOne({
-          id: user.id
-        }, {
-          verified: true
-        })
-      }
-
-      // log in the session and delete token
-      await Sessions.updateOne({
-        sid: session.sid
-      }, {
-        sess: {
-          ...session.sess,
-          token: null,
-          passport: {
-            user: user.id
-          }
-        }
-      })
-
-      //call signIn hooks
-      await Promise.all(
-        signInHooks.map( hook =>
-          hook(user.id, !existingUser, pgdb)
-        )
-      )
-
-      // success
-      return res.redirect(
-        `${FRONTEND_BASE_URL}/notifications?` +
-        querystring.stringify({
-          type: 'email-confirmed',
-          email,
-          context
-        })
-      )
-    } catch (e) {
-      const util = require('util')
-      console.error('auth: exception', util.inspect({ req: req._log(), emailFromQuery, context, e }, {depth: null}))
-      return res.redirect(
-        `${FRONTEND_BASE_URL}/notifications?` +
-        querystring.stringify({
-          type: 'unavailable',
-          emailFromQuery,
-          context
-        })
-      )
-    }
-  })
 
   // Tell Passport how to seralize/deseralize user accounts
   passport.serializeUser(function (user, next) {

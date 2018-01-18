@@ -1,10 +1,10 @@
 {
-  "updated": "2017-12-26T00:34:56.432Z",
+  "updated": "2018-01-14T06:10:14.941Z",
   "title": "live",
   "data": [
     {
       "key": "api/signIn",
-      "value": "Sie müssen sich zuerst einloggen."
+      "value": "Sie müssen sich zuerst anmelden."
     },
     {
       "key": "api/unauthorized",
@@ -35,6 +35,10 @@
       "value": "E-Mail-Adresse bestätigen (für die Republik)"
     },
     {
+      "key": "api/token/invalid",
+      "value": "Token ungültig!"
+    },
+    {
       "key": "api/checkUsername/min",
       "value": "Benutzername, minimal {count} Zeichen"
     },
@@ -49,6 +53,18 @@
     {
       "key": "api/checkUsername/taken",
       "value": "Benutzername, nicht mehr verfügbar"
+    },
+    {
+      "key": "api/users/404",
+      "value": "Der User konnte leider nicht gefunden werden."
+    },
+    {
+      "key": "api/email/change/confirmation/subject",
+      "value": "Ihre E-Mail-Adresse wurde geändert"
+    },
+    {
+      "key": "api/email/change/exists",
+      "value": "Es existiert bereits jemand mit der gewünschten E-Mail-Adresse."
     }
   ]
 }
