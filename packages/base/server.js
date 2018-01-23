@@ -25,6 +25,7 @@ const {
 // middlewares
 const { express: { auth } } = require('@orbiting/backend-modules-auth')
 const requestLog = require('./express/requestLog')
+const rateLimit = require('./express/rateLimit')
 const graphql = require('./express/graphql')
 
 let pgdb
@@ -81,6 +82,9 @@ module.exports.run = (executableSchema, middlewares, t, createGraphqlContext) =>
       dev: DEV,
       pgdb: pgdb
     })
+
+    // Rate Limiting middleware needs to be after auth to access user id
+    server.use(rateLimit)
 
     if (CORS_WHITELIST_URL) {
       const corsOptions = {
