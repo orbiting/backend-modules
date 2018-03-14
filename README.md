@@ -1,5 +1,7 @@
-backend modules
----------------
+**DEPRECATED**: This repository together with others has been merged into the [orbiting/backends](https://github.com/orbiting/backends) monorepo. Let's continue the journey there.
+
+[DEPRECATED] backend modules
+----------------------------
 
 modules used in various backend projects.
 
