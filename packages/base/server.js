@@ -65,7 +65,7 @@ module.exports.run = (executableSchema, middlewares, t, createGraphqlContext) =>
     if (!DEV) {
       server.use(compression())
       server.enable('trust proxy')
-      server.use( (req, res, next) => {
+      server.use((req, res, next) => {
         if (!req.secure && (!IGNORE_SSL_HOSTNAME || req.hostname !== IGNORE_SSL_HOSTNAME)) {
           res.redirect(`https://${req.hostname}${req.url}`)
         }
